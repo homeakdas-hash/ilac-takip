@@ -1,259 +1,225 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-<link rel="manifest" href="./manifest.json">
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>İlaç ve Envanter Takip Sistemi</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>İlaç Takip ve Envanter</title>
+  <link rel="manifest" href="./manifest.json">
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --text: #1e293b;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 16px;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    h1 { text-align: center; color: var(--primary); font-size: 1.5rem; }
+    .card {
+      background: var(--card);
+      padding: 16px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      margin-bottom: 16px;
+    }
+    .btn {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 8px;
+      background-color: var(--primary);
+      color: white;
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
+      margin-bottom: 8px;
+    }
+    .btn-secondary { background-color: #64748b; }
+    .btn-success { background-color: #16a34a; }
+    input, select {
+      width: 100%;
+      padding: 12px;
+      margin: 8px 0;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      box-sizing: border-box;
+      font-size: 1rem;
+    }
+    #reader {
+      width: 100%;
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 12px;
+      display: none;
+    }
+    .med-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .med-item:last-child { border-bottom: none; }
+    .badge {
+      background: #e0e7ff;
+      color: #3730a3;
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+    }
+  </style>
 </head>
-<body class="bg-gray-50 text-gray-800 min-h-screen">
+<body>
 
-    <div class="max-w-4xl mx-auto p-4 sm:p-6">
-        <!-- Başlık -->
-        <header class="flex flex-col sm:flex-row justify-between items-center mb-6 pb-4 border-b border-gray-200">
-            <h1 class="text-2xl font-bold text-blue-600 mb-2 sm:mb-0">💊 İlaç Takip ve Envanter</h1>
-            <div class="flex gap-2">
-                <button onclick="openScanner()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium shadow transition">
-                    📷 Barkod Tara
-                </button>
-                <button onclick="openModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium shadow transition">
-                    + Yeni İlaç Ekle
-                </button>
-            </div>
-        </header>
+  <h1>💊 İlaç Takip & Envanter</h1>
 
-        <!-- Arama ve Filtreleme -->
-        <div class="flex flex-col sm:flex-row gap-3 mb-6">
-            <input type="text" id="searchInput" oninput="filterMeds()" placeholder="İlaç adı veya barkod ile ara..." class="flex-1 bg-white border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <select id="statusFilter" onchange="filterMeds()" class="bg-white border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option value="all">Tüm Durumlar</option>
-                <option value="normal">Stokta Normal</option>
-                <option value="low">Kritik Stok (<= 2)</option>
-            </select>
+  <!-- Barkod Tarama Alanı -->
+  <div class="card">
+    <button class="btn" onclick="startScanner()">📷 Barkod Tara ve İlaç Ekle</button>
+    <div id="reader"></div>
+  </div>
+
+  <!-- İlaç Ekleme Formu -->
+  <div class="card" id="formCard">
+    <h3>İlaç Bilgileri</h3>
+    <input type="text" id="barcode" placeholder="Barkod Numarası" readonly>
+    <input type="text" id="medName" placeholder="İlaç Adı (Otomatik Aranıyor...)">
+    <input type="number" id="stock" placeholder="Stok Adedi" value="1">
+    <input type="text" id="shelf" placeholder="Raf / Dolap Konumu (Örn: A-1, Mutfak Dolabı)">
+    <button class="btn btn-success" onclick="saveMedicine()">💾 Sisteme Kaydet</button>
+  </div>
+
+  <!-- Stok Listesi -->
+  <div class="card">
+    <h3>📋 Mevcut İlaç Stok Listesi</h3>
+    <div id="medList">Henüz eklenmiş ilaç yok.</div>
+  </div>
+
+  <script>
+    let html5QrcodeScanner = null;
+    let inventory = JSON.parse(localStorage.getItem('ilac_envanter')) || [];
+
+    renderList();
+
+    function startScanner() {
+      const readerDiv = document.getElementById('reader');
+      readerDiv.style.display = 'block';
+
+      if (!html5QrcodeScanner) {
+        html5QrcodeScanner = new Html5Qrcode("reader");
+      }
+
+      html5QrcodeScanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 250, height: 150 } },
+        onScanSuccess
+      ).catch(err => {
+        alert("Kamera başlatılamadı: " + err);
+        readerDiv.style.display = 'none';
+      });
+    }
+
+    function onScanSuccess(decodedText) {
+      if (html5QrcodeScanner) {
+        html5QrcodeScanner.stop().then(() => {
+          document.getElementById('reader').style.display = 'none';
+        });
+      }
+
+      document.getElementById('barcode').value = decodedText;
+      fetchMedicineName(decodedText);
+    }
+
+    async function fetchMedicineName(barcode) {
+      const nameInput = document.getElementById('medName');
+      nameInput.value = "Sorgulanıyor...";
+
+      try {
+        // CORS proxy üzerinden ilactr.com sorgusu
+        const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent('https://www.ilactr.com/arama/?q=' + barcode)}`);
+        const data = await res.json();
+        
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(data.contents, 'text/html');
+        const firstResult = doc.querySelector('.ilac-listesi a, .search-results a');
+
+        if (firstResult && firstResult.innerText) {
+          nameInput.value = firstResult.innerText.trim();
+        } else {
+          nameInput.value = "";
+          nameInput.placeholder = "İlaç ismi bulunamadı, lütfen elle yazın";
+        }
+      } catch (e) {
+        nameInput.value = "";
+        nameInput.placeholder = "İlaç ismi manuel giriniz";
+      }
+    }
+
+    function saveMedicine() {
+      const barcode = document.getElementById('barcode').value;
+      const name = document.getElementById('medName').value;
+      const stock = document.getElementById('stock').value;
+      const shelf = document.getElementById('shelf').value;
+
+      if (!barcode || !name) {
+        alert("Lütfen önce barkod taratın ve ilaç adını kontrol edin.");
+        return;
+      }
+
+      const newItem = {
+        id: Date.now(),
+        barcode,
+        name,
+        stock: parseInt(stock) || 1,
+        shelf: shelf || 'Belirtilmedi'
+      };
+
+      inventory.push(newItem);
+      localStorage.setItem('ilac_envanter', JSON.stringify(inventory));
+
+      // Formu Sıfırla
+      document.getElementById('barcode').value = "";
+      document.getElementById('medName').value = "";
+      document.getElementById('stock').value = "1";
+      document.getElementById('shelf').value = "";
+
+      renderList();
+      alert("İlaç başarıyla kaydoldu!");
+    }
+
+    function renderList() {
+      const container = document.getElementById('medList');
+      if (inventory.length === 0) {
+        container.innerHTML = "Henüz kayıtlı ilaç bulunmuyor.";
+        return;
+      }
+
+      container.innerHTML = inventory.map(item => `
+        <div class="med-item">
+          <div>
+            <strong>${item.name}</strong><br>
+            <small>Barkod: ${item.barcode} | Konum: ${item.shelf}</small>
+          </div>
+          <span class="badge">${item.stock} Adet</span>
         </div>
+      `).join('');
+    }
 
-        <!-- Kamera / Barkod Alanı -->
-        <div id="scanner-container" class="hidden mb-6 bg-white p-4 rounded-xl shadow border border-gray-200">
-            <div id="reader" class="w-full max-w-md mx-auto"></div>
-            <button onclick="closeScanner()" class="mt-3 w-full bg-red-500 hover:bg-red-600 text-white py-2 rounded-lg font-medium">Kamerayı Kapat</button>
-        </div>
-
-        <!-- İlaç Listesi Tablosu -->
-        <div class="bg-white rounded-xl shadow overflow-hidden border border-gray-200">
-            <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse">
-                    <thead>
-                        <tr class="bg-gray-100 border-b border-gray-200 text-sm font-semibold text-gray-600">
-                            <th class="p-3">Barkod</th>
-                            <th class="p-3">İlaç Adı</th>
-                            <th class="p-3">Adet</th>
-                            <th class="p-3">Raf / Konum</th>
-                            <th class="p-3 text-right">İşlemler</th>
-                        </tr>
-                    </thead>
-                    <tbody id="medTableBody" class="divide-y divide-gray-200 text-sm">
-                        <!-- Dinamik Dolacak -->
-                    </tbody>
-                </table>
-            </div>
-            <div id="emptyState" class="p-8 text-center text-gray-500 hidden">
-                Kayıtlı ilaç bulunamadı.
-            </div>
-        </div>
-    </div>
-
-    <!-- Yeni İlaç / Düzenleme Modal -->
-    <div id="medModal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
-        <div class="bg-white rounded-xl max-w-md w-full p-6 shadow-xl">
-            <h2 id="modalTitle" class="text-xl font-bold mb-4 text-gray-800">Yeni İlaç Ekle</h2>
-            <form id="medForm" onsubmit="saveMed(event)">
-                <input type="hidden" id="editIndex" value="">
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Barkod Numarası</label>
-                    <div class="flex gap-2">
-                        <input type="text" id="barcodeInput" required class="flex-1 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <button type="button" onclick="fetchFromIlacTr()" class="bg-gray-800 hover:bg-gray-900 text-white px-3 py-2 rounded-lg text-sm">İlaçTr Sorgula</button>
-                    </div>
-                </div>
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">İlaç Adı</label>
-                    <input type="text" id="nameInput" required class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                </div>
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Stok Adedi</label>
-                    <input type="number" id="countInput" min="0" value="1" required class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                </div>
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Raf / Konum Bilgisi</label>
-                    <input type="text" id="locationInput" placeholder="Örn: Raf A-3" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                </div>
-                <div class="flex justify-end gap-2 pt-2">
-                    <button type="button" onclick="closeModal()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg font-medium">İptal</button>
-                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium">Kaydet</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <script>
-        let medications = JSON.parse(localStorage.getItem('medications')) || [];
-        let html5QrCode = null;
-
-        function renderTable(dataToRender = medications) {
-            const tbody = document.getElementById('medTableBody');
-            const emptyState = document.getElementById('emptyState');
-            tbody.innerHTML = '';
-
-            if (dataToRender.length === 0) {
-                emptyState.classList.remove('hidden');
-                return;
-            }
-            emptyState.classList.add('hidden');
-
-            dataToRender.forEach((med, index) => {
-                const tr = document.createElement('tr');
-                if (med.count <= 2) {
-                    tr.classList.add('bg-red-50');
-                }
-                tr.innerHTML = `
-                    <td class="p-3 font-mono text-gray-600">${med.barcode}</td>
-                    <td class="p-3 font-medium text-gray-800">${med.name}</td>
-                    <td class="p-3">
-                        <span class="px-2 py-1 rounded text-xs font-bold ${med.count <= 2 ? 'bg-red-200 text-red-800' : 'bg-green-100 text-green-800'}">
-                            ${med.count} Adet
-                        </span>
-                    </td>
-                    <td class="p-3 text-gray-600">${med.location || '-'}</td>
-                    <td class="p-3 text-right space-x-2">
-                        <button onclick="changeCount(${index}, 1)" class="bg-gray-200 hover:bg-gray-300 px-2 py-1 rounded font-bold">+</button>
-                        <button onclick="changeCount(${index}, -1)" class="bg-gray-200 hover:bg-gray-300 px-2 py-1 rounded font-bold">-</button>
-                        <button onclick="editMed(${index})" class="text-blue-600 hover:underline">Düzenle</button>
-                        <button onclick="deleteMed(${index})" class="text-red-600 hover:underline">Sil</button>
-                    </td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
-
-        function openModal() {
-            document.getElementById('modalTitle').innerText = 'Yeni İlaç Ekle';
-            document.getElementById('medForm').reset();
-            document.getElementById('editIndex').value = '';
-            document.getElementById('medModal').classList.remove('hidden');
-        }
-
-        function closeModal() {
-            document.getElementById('medModal').classList.add('hidden');
-        }
-
-        function saveMed(e) {
-            e.preventDefault();
-            const editIndex = document.getElementById('editIndex').value;
-            const barcode = document.getElementById('barcodeInput').value;
-            const name = document.getElementById('nameInput').value;
-            const count = parseInt(document.getElementById('countInput').value);
-            const location = document.getElementById('locationInput').value;
-
-            const medData = { barcode, name, count, location };
-
-            if (editIndex === '') {
-                medications.push(medData);
-            } else {
-                medications[editIndex] = medData;
-            }
-
-            localStorage.setItem('medications', JSON.stringify(medications));
-            closeModal();
-            renderTable();
-        }
-
-        function editMed(index) {
-            const med = medications[index];
-            document.getElementById('modalTitle').innerText = 'İlaç Düzenle';
-            document.getElementById('editIndex').value = index;
-            document.getElementById('barcodeInput').value = med.barcode;
-            document.getElementById('nameInput').value = med.name;
-            document.getElementById('countInput').value = med.count;
-            document.getElementById('locationInput').value = med.location || '';
-            document.getElementById('medModal').classList.remove('hidden');
-        }
-
-        function deleteMed(index) {
-            if (confirm('Bu ilacı silmek istediğinize emin misiniz?')) {
-                medications.splice(index, 1);
-                localStorage.setItem('medications', JSON.stringify(medications));
-                renderTable();
-            }
-        }
-
-        function changeCount(index, amount) {
-            medications[index].count = Math.max(0, medications[index].count + amount);
-            localStorage.setItem('medications', JSON.stringify(medications));
-            filterMeds();
-        }
-
-        function filterMeds() {
-            const query = document.getElementById('searchInput').value.toLowerCase();
-            const status = document.getElementById('statusFilter').value;
-
-            let filtered = medications.filter(med => {
-                const matchesQuery = med.name.toLowerCase().includes(query) || med.barcode.includes(query);
-                if (status === 'low') return matchesQuery && med.count <= 2;
-                return matchesQuery;
-            });
-
-            renderTable(filtered);
-        }
-
-        // İlactr.com entegrasyon simülasyonu / yardımcı fonksiyonu
-        function fetchFromIlacTr() {
-            const barcode = document.getElementById('barcodeInput').value.trim();
-            if (!barcode) {
-                alert('Lütfen önce bir barkod girin.');
-                return;
-            }
-            // Not: Tarayıcı güvenliği (CORS) nedeniyle doğrudan dış sitelerden veri çekmek kısıtlı olabilir. 
-            // Bu alan ilactr.com üzerindeki yapıya göre veya bir proxy/API servis katmanına bağlanmak üzere yapılandırılabilir.
-            alert(barcode + ' barkod numarası için ilactr.com dizin sorgusu simüle edildi. (Gerekirse backend yönlendirmesi eklenebilir)');
-            // Örnek otomatik doldurma simülasyonu:
-            document.getElementById('nameInput').value = "Örnek İlaç (" + barcode + ")";
-        }
-
-        // Kamera Barkod Tarayıcı (html5-qrcode)
-        function openScanner() {
-            document.getElementById('scanner-container').classList.remove('hidden');
-            html5QrCode = new Html5Qrcode("reader");
-            html5QrCode.start(
-                { facingMode: "environment" },
-                { fps: 10, qrbox: { width: 250, height: 150 } },
-                (decodedText) => {
-                    document.getElementById('barcodeInput').value = decodedText;
-                    closeScanner();
-                    openModal();
-                    fetchFromIlacTr();
-                },
-                (error) => {}
-            ).catch(err => {
-                alert("Kamera başlatılamadı: " + err);
-            });
-        }
-
-        function closeScanner() {
-            if (html5QrCode) {
-                html5QrCode.stop().then(() => {
-                    document.getElementById('scanner-container').classList.add('hidden');
-                }).catch(err => {
-                    document.getElementById('scanner-container').classList.add('hidden');
-                });
-            } else {
-                document.getElementById('scanner-container').classList.add('hidden');
-            }
-        }
-
-        // Sayfa açıldığında tabloyu yükle
-        renderTable();
-    </script>
+    // Service Worker Kaydı
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      });
+    }
+  </script>
 </body>
 </html>
