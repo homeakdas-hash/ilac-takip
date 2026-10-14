@@ -1,11 +1,22 @@
 {
-  "background_color": "#ffffff",
-  "dir": "ltr",
-  "display": "standalone",
+  "id": "/ilac-takip/",
   "name": "İlaç Takip ve Envanter",
-  "orientation": "any",
-  "scope": "/",
   "short_name": "İlaç Takip",
-  "start_url": "index.html",
-  "theme_color": "#2563eb"
+  "description": "Evdeki ilaçları yönetmek ve barkod okutarak stok eklemek için mobil web uygulaması.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "lang": "tr",
+  "dir": "ltr",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/822/822146.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
 }
