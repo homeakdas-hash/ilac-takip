@@ -1,8 +1,8 @@
 {
-  "id": "/ilac-takip/",
+  "id": "ilac-takip-pwa",
   "name": "İlaç Takip ve Envanter",
   "short_name": "İlaç Takip",
-  "description": "Evdeki ilaçları yönetmek ve barkod okutarak stok eklemek için mobil web uygulaması.",
+  "description": "Evdeki ilaçları yönetmek ve barkod okutarak stok takibi yapmak için mobil web uygulaması.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
@@ -13,10 +13,10 @@
   "dir": "ltr",
   "icons": [
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/822/822146.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' fill='%232563eb'/><text x='50%' y='55%' fill='white' font-size='250' font-family='sans-serif' text-anchor='middle' dominant-baseline='middle'>💊</text></svg>",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
     }
   ]
 }
